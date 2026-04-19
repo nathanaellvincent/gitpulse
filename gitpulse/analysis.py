@@ -80,3 +80,45 @@ def commits_by_weekday(commits_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(
         {"weekday": order, "commits": [int(counts.get(d, 0)) for d in order]}
     )
+
+
+def top_contributors(contributors: list[dict], limit: int = 10) -> pd.DataFrame:
+    """Shape /contributors responses into a rank-ordered DataFrame.
+
+    GitHub already returns this endpoint sorted by contribution count,
+    so we just trim to the top N and keep the fields the chart needs.
+    """
+    rows = [
+        {
+            "login": c.get("login") or "anonymous",
+            "contributions": int(c.get("contributions", 0)),
+            "avatar": c.get("avatar_url"),
+        }
+        for c in contributors[:limit]
+    ]
+    return pd.DataFrame(rows)
+
+
+def bus_factor(contributors: list[dict], threshold: float = 0.5) -> int:
+    """Minimum contributors responsible for ``threshold`` of all commits.
+
+    The classic 'bus factor': if the top N people together account for
+    more than half (default) of commits, that's the number of people
+    who would need to leave before the project is in trouble.
+
+    A low number on an otherwise active repo is a classic key-person
+    risk signal.
+    """
+    if not contributors:
+        return 0
+    total = sum(int(c.get("contributions", 0)) for c in contributors)
+    if total == 0:
+        return 0
+    target = total * threshold
+    running = 0
+    # /contributors is already sorted desc by count.
+    for i, c in enumerate(contributors, start=1):
+        running += int(c.get("contributions", 0))
+        if running >= target:
+            return i
+    return len(contributors)
