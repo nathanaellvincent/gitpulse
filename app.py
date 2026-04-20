@@ -14,6 +14,7 @@ from gitpulse.analysis import (
     top_contributors,
     weekly_activity,
 )
+from gitpulse.charts import weekly_activity_chart
 from gitpulse.github_client import GitHubClient, RepoRef, parse_repo_url
 
 
@@ -118,7 +119,7 @@ contributors_df = top_contributors(contributors)
 
 st.subheader("Weekly commit activity")
 st.caption("ISO-week buckets across the sampled commit window.")
-st.dataframe(weekly_df.tail(12), use_container_width=True, hide_index=True)
+st.plotly_chart(weekly_activity_chart(weekly_df), use_container_width=True)
 
 st.subheader("Top contributors")
 st.dataframe(contributors_df, use_container_width=True, hide_index=True)
