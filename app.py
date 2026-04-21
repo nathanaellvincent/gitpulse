@@ -6,6 +6,8 @@ so the UI is easy to read and the analysis is easy to unit-test.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import streamlit as st
 
 from gitpulse.analysis import (
@@ -19,7 +21,14 @@ from gitpulse.charts import (
     language_pie_chart,
     weekly_activity_chart,
 )
-from gitpulse.github_client import GitHubClient, RepoRef, parse_repo_url
+from gitpulse.github_client import (
+    GitHubClient,
+    GitPulseError,
+    RateLimitError,
+    RepoNotFoundError,
+    RepoRef,
+    parse_repo_url,
+)
 
 
 st.set_page_config(
@@ -95,8 +104,22 @@ if ref is None:
     )
     st.stop()
 
-with st.spinner(f"Loading {ref.slug}…"):
-    data = load_repo_data(ref.slug, token)
+try:
+    with st.spinner(f"Loading {ref.slug}…"):
+        data = load_repo_data(ref.slug, token)
+except RepoNotFoundError as exc:
+    st.error(str(exc))
+    st.stop()
+except RateLimitError as exc:
+    msg = str(exc)
+    if exc.reset_epoch:
+        reset_dt = datetime.fromtimestamp(exc.reset_epoch, tz=timezone.utc)
+        msg += f"\n\nLimit resets at {reset_dt.strftime('%H:%M UTC')}."
+    st.error(msg)
+    st.stop()
+except GitPulseError as exc:
+    st.error(str(exc))
+    st.stop()
 
 repo = data["repo"]
 commits_df = commits_to_dataframe(data["commits"])

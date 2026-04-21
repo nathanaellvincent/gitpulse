@@ -1,8 +1,8 @@
 """Thin wrapper around the GitHub REST API.
 
-Handles URL parsing, pagination via the Link header, and shapes
-responses into plain Python lists so the analysis layer doesn't
-need to know anything about HTTP.
+Handles URL parsing, pagination via the Link header, rate-limit
+detection, and shapes responses into plain Python lists so the
+analysis layer doesn't need to know anything about HTTP.
 """
 
 from __future__ import annotations
@@ -16,6 +16,27 @@ import requests
 
 GITHUB_API = "https://api.github.com"
 DEFAULT_PER_PAGE = 100
+
+
+class GitPulseError(Exception):
+    """Base class for GitPulse runtime errors surfaced to the UI."""
+
+
+class RepoNotFoundError(GitPulseError):
+    """The repository doesn't exist or is private."""
+
+
+class RateLimitError(GitPulseError):
+    """GitHub returned a rate-limit response.
+
+    ``reset_epoch`` is the UNIX timestamp when the limit clears
+    (from GitHub's X-RateLimit-Reset header). The UI formats it
+    into a human-readable countdown.
+    """
+
+    def __init__(self, message: str, reset_epoch: Optional[int] = None) -> None:
+        super().__init__(message)
+        self.reset_epoch = reset_epoch
 
 
 @dataclass(frozen=True)
@@ -104,12 +125,7 @@ class GitHubClient:
     # ---- plumbing ------------------------------------------------------
 
     def _get_json(self, path: str, params: Optional[dict] = None) -> dict:
-        resp = self.session.get(
-            f"{GITHUB_API}{path}",
-            params=params,
-            timeout=self.timeout,
-        )
-        resp.raise_for_status()
+        resp = self._request("GET", f"{GITHUB_API}{path}", params=params)
         return resp.json()
 
     def _paginate(
@@ -127,8 +143,7 @@ class GitHubClient:
         merged = {"per_page": DEFAULT_PER_PAGE, **(params or {})}
         seen = 0
         while url and seen < limit:
-            resp = self.session.get(url, params=merged, timeout=self.timeout)
-            resp.raise_for_status()
+            resp = self._request("GET", url, params=merged)
             batch = resp.json()
             if not isinstance(batch, list):
                 return
@@ -140,6 +155,42 @@ class GitHubClient:
             url = _next_link(resp.headers.get("Link"))
             # After the first request the full next URL already has params.
             merged = {}
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        params: Optional[dict] = None,
+    ) -> requests.Response:
+        """Single centralised request + error-classification helper.
+
+        Every outgoing call goes through here so rate-limit and
+        not-found responses surface as typed exceptions instead of
+        opaque HTTPError blobs the UI would have to sniff at.
+        """
+        try:
+            resp = self.session.get(url, params=params, timeout=self.timeout)
+        except requests.RequestException as exc:
+            raise GitPulseError(f"Network error talking to GitHub: {exc}") from exc
+
+        # Classify before raise_for_status so our exceptions win.
+        if resp.status_code == 404:
+            raise RepoNotFoundError(
+                "Repository not found, or the token lacks access. "
+                "Check the URL and that the repo is public."
+            )
+        if resp.status_code in (403, 429):
+            remaining = resp.headers.get("X-RateLimit-Remaining")
+            if remaining == "0":
+                reset = resp.headers.get("X-RateLimit-Reset")
+                raise RateLimitError(
+                    "GitHub API rate limit exceeded. "
+                    "Paste a personal access token in the sidebar to "
+                    "lift the ceiling from 60/hour to 5000/hour.",
+                    reset_epoch=int(reset) if reset else None,
+                )
+        resp.raise_for_status()
+        return resp
 
 
 _LINK_NEXT = re.compile(r'<([^>]+)>;\s*rel="next"')
