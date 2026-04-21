@@ -14,7 +14,11 @@ from gitpulse.analysis import (
     top_contributors,
     weekly_activity,
 )
-from gitpulse.charts import weekly_activity_chart
+from gitpulse.charts import (
+    contributors_bar_chart,
+    language_pie_chart,
+    weekly_activity_chart,
+)
 from gitpulse.github_client import GitHubClient, RepoRef, parse_repo_url
 
 
@@ -121,13 +125,16 @@ st.subheader("Weekly commit activity")
 st.caption("ISO-week buckets across the sampled commit window.")
 st.plotly_chart(weekly_activity_chart(weekly_df), use_container_width=True)
 
-st.subheader("Top contributors")
-st.dataframe(contributors_df, use_container_width=True, hide_index=True)
-
-st.subheader("Language breakdown")
-st.dataframe(
-    {"language": list(data["languages"].keys()),
-     "bytes": list(data["languages"].values())},
-    use_container_width=True,
-    hide_index=True,
-)
+chart_cols = st.columns(2)
+with chart_cols[0]:
+    st.subheader("Top contributors")
+    st.plotly_chart(
+        contributors_bar_chart(contributors_df),
+        use_container_width=True,
+    )
+with chart_cols[1]:
+    st.subheader("Language breakdown")
+    st.plotly_chart(
+        language_pie_chart(data["languages"]),
+        use_container_width=True,
+    )
