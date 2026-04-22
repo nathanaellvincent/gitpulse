@@ -1,0 +1,16 @@
+# Dark navy theme, matched to the Plotly palette in gitpulse/charts.py.
+# Edit charts.py (ACCENT, INK, SURFACE constants) if you change these.
+
+[theme]
+base = "dark"
+primaryColor = "#60a5fa"
+backgroundColor = "#0b1220"
+secondaryBackgroundColor = "#0f172a"
+textColor = "#e6edf3"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
