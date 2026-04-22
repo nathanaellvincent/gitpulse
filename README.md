@@ -4,7 +4,7 @@ A web tool that turns any public GitHub repository into an at-a-glance analytics
 
 Built with **Python**, **Streamlit**, **pandas**, and **Plotly**, on top of the public GitHub REST API.
 
-**Live:** [gitpulse.streamlit.app](https://gitpulse.streamlit.app) *(deploy pending)*
+**Live:** [gitpulse-vn.streamlit.app](https://gitpulse-vn.streamlit.app)
 
 ## What it shows
 

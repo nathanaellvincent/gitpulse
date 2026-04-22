@@ -131,10 +131,26 @@ st.title(repo.get("full_name", ref.slug))
 if repo.get("description"):
     st.caption(repo["description"])
 
+def _compact(n: int) -> str:
+    """Compact number format (244,673 -> 244K, 1,203,455 -> 1.2M).
+
+    Streamlit's metric cards get cramped at 5 columns; abbreviating
+    large counts keeps every card legible without dropping signal.
+    """
+    n = int(n)
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 10_000:
+        return f"{n // 1_000}K"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}K"
+    return f"{n:,}"
+
+
 meta_cols = st.columns(5)
-meta_cols[0].metric("Stars", f"{repo.get('stargazers_count', 0):,}")
-meta_cols[1].metric("Forks", f"{repo.get('forks_count', 0):,}")
-meta_cols[2].metric("Open issues", f"{repo.get('open_issues_count', 0):,}")
+meta_cols[0].metric("Stars", _compact(repo.get("stargazers_count", 0)))
+meta_cols[1].metric("Forks", _compact(repo.get("forks_count", 0)))
+meta_cols[2].metric("Open issues", _compact(repo.get("open_issues_count", 0)))
 meta_cols[3].metric("Commits sampled", f"{len(commits_df):,}")
 meta_cols[4].metric("Bus factor", bus_factor(contributors))
 
